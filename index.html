@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLUX PDF</title>
+    
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #6366f1; --bg: #0f172a; --surface: #ffffff; --text: #1e293b; --sub: #64748b; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .app-card { width: 95%; max-width: 750px; background: var(--surface); border-radius: 24px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        
+        /* Mode Selector */
+        .mode-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 25px; }
+        .mode-btn { border: 2px solid #f1f5f9; padding: 15px; border-radius: 16px; text-align: center; cursor: pointer; transition: 0.2s; background: #f8fafc; }
+        .mode-btn.active { border-color: var(--primary); background: #f5f7ff; transform: scale(1.02); }
+        .mode-btn i { color: var(--primary); margin-bottom: 8px; display: block; margin: 0 auto 8px; }
+        .mode-btn span { font-weight: 700; font-size: 0.8rem; }
+
+        /* Upload Area */
+        .upload-zone { border: 2px dashed #e2e8f0; border-radius: 20px; padding: 40px; text-align: center; cursor: pointer; background: #ffffff; transition: 0.2s; }
+        .upload-zone:hover { border-color: var(--primary); background: #f9fafb; }
+        
+        /* File Management */
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 0; margin: 20px 0; }
+        .file-item { list-style: none; background: #f1f5f9; padding: 12px; border-radius: 12px; cursor: grab; position: relative; font-size: 0.75rem; text-align: center; border: 1px solid #e2e8f0; }
+        .remove-btn { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; }
+
+        /* Settings Bar */
+        .settings-bar { background: #f8fafc; padding: 15px; border-radius: 16px; margin-top: 15px; border: 1px solid #e2e8f0; }
+        input[type="range"] { width: 100%; accent-color: var(--primary); }
+
+        .btn-main { width: 100%; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 14px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 20px; }
+        .hidden { display: none; }
+        #loader { position: fixed; inset: 0; background: rgba(15,23,42,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 1000; backdrop-filter: blur(5px); }
+        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="app-card">
+        <header style="text-align: center; margin-bottom: 25px;">
+            <h2 style="margin:0; font-weight: 800;">FLUX<span> PDF</span></h2>
+            <p style="color: var(--sub); font-size: 0.85rem;">Select your document goal</p>
+        </header>
+
+        <div class="mode-selector">
+            <div class="mode-btn active" id="btn-merge" onclick="switchMode('merge')">
+                <i data-lucide="layers"></i>
+                <span>Merge PDF</span>
+            </div>
+            <div class="mode-btn" id="btn-img" onclick="switchMode('image')">
+                <i data-lucide="image"></i>
+                <span>Image to PDF</span>
+            </div>
+            <div class="mode-btn" id="btn-comp" onclick="switchMode('compress')">
+                <i data-lucide="minimize-2"></i>
+                <span>Compress</span>
+            </div>
+        </div>
+
+        <div id="drop-zone" class="upload-zone">
+            <i data-lucide="upload-cloud" style="width:40px; height:40px; color:var(--primary); margin-bottom:10px;"></i>
+            <h4 id="up-title" style="margin:0;">Merge Multiple PDFs</h4>
+            <p id="up-desc" style="font-size:0.8rem; color:var(--sub);">Select 2 or more files</p>
+            <input type="file" id="file-input" hidden multiple>
+        </div>
+
+        <div id="editor-view" class="hidden">
+            <ul id="sortable-list" class="file-grid"></ul>
+            
+            <div id="comp-settings" class="settings-bar hidden">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:700; margin-bottom:10px;">
+                    <span>Strict Quality Level</span>
+                    <span id="q-label" style="color:var(--primary)">50%</span>
+                </div>
+                <input type="range" id="quality" min="10" max="90" value="50">
+            </div>
+
+            <button class="btn-main" id="process-btn">Process & Download</button>
+            <button onclick="resetApp()" style="width:100%; background:none; border:none; color:var(--sub); margin-top:15px; cursor:pointer; font-size:0.8rem;">Clear All</button>
+        </div>
+    </div>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="load-msg">Rendering assets...</div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        let currentMode = 'merge';
+        let queue = [];
+        const fileInput = document.getElementById('file-input');
+        const sortableList = document.getElementById('sortable-list');
+        const qualitySlider = document.getElementById('quality');
+
+        function switchMode(mode) {
+            currentMode = mode;
+            resetApp();
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${mode === 'image' ? 'img' : mode === 'merge' ? 'merge' : 'comp'}`).classList.add('active');
+
+            const title = document.getElementById('up-title');
+            const desc = document.getElementById('up-desc');
+            const compSet = document.getElementById('comp-settings');
+
+            if(mode === 'merge') {
+                title.innerText = "Merge Multiple PDFs"; desc.innerText = "Fast merging of PDF documents";
+                fileInput.accept = ".pdf"; fileInput.multiple = true;
+                compSet.classList.add('hidden');
+            } else if(mode === 'image') {
+                title.innerText = "Images to PDF"; desc.innerText = "Convert JPG/PNG to a single PDF";
+                fileInput.accept = "image/*"; fileInput.multiple = true;
+                compSet.classList.add('hidden');
+            } else {
+                title.innerText = "Strict Compression"; desc.innerText = "Forcefully shrink PDF file size";
+                fileInput.accept = ".pdf"; fileInput.multiple = false;
+                compSet.classList.remove('hidden');
+            }
+        }
+
+        qualitySlider.oninput = () => document.getElementById('q-label').innerText = qualitySlider.value + '%';
+        document.getElementById('drop-zone').onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => queue.push({ id: 'f'+Math.random().toString(36).substr(2,7), file }));
+            render();
+        }
+
+        function render() {
+            sortableList.innerHTML = '';
+            document.getElementById('drop-zone').classList.add('hidden');
+            document.getElementById('editor-view').classList.remove('hidden');
+            queue.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.id = item.id;
+                li.innerHTML = `<i data-lucide="file"></i><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.file.name}</div><div class="remove-btn" onclick="removeItem('${item.id}', event)">×</div>`;
+                sortableList.appendChild(li);
+            });
+            lucide.createIcons();
+        }
+
+        function removeItem(id, e) { e.stopPropagation(); queue = queue.filter(i => i.id !== id); if(queue.length === 0) resetApp(); else render(); }
+
+        function resetApp() {
+            queue = []; fileInput.value = '';
+            document.getElementById('drop-zone').classList.remove('hidden');
+            document.getElementById('editor-view').classList.add('hidden');
+        }
+
+        document.getElementById('process-btn').onclick = async () => {
+            document.getElementById('loader').style.display = 'flex';
+            const { PDFDocument } = PDFLib;
+            const outPdf = await PDFDocument.create();
+            const quality = qualitySlider.value / 100;
+
+            try {
+                for (const item of queue) {
+                    const bytes = await item.file.arrayBuffer();
+                    if(currentMode === 'compress') {
+                        const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+                        for (let i = 1; i <= pdfDoc.numPages; i++) {
+                            document.getElementById('load-msg').innerText = `Compressing Page ${i}...`;
+                            const page = await pdfDoc.getPage(i);
+                            const viewport = page.getViewport({ scale: 1.2 });
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.height = viewport.height; canvas.width = viewport.width;
+                            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                            const imgData = canvas.toDataURL('image/jpeg', quality);
+                            const imgBytes = await fetch(imgData).then(r => r.arrayBuffer());
+                            const img = await outPdf.embedJpg(imgBytes);
+                            outPdf.addPage([img.width, img.height]).drawImage(img, { x:0, y:0, width:img.width, height:img.height });
+                        }
+                    } else if (currentMode === 'image') {
+                        const imgBytes = await compressImage(bytes, 0.8);
+                        const img = await outPdf.embedJpg(imgBytes);
+                        outPdf.addPage([img.width, img.height]).drawImage(img, { x:0, y:0, width:img.width, height:img.height });
+                    } else {
+                        const pdf = await PDFDocument.load(bytes);
+                        const pages = await outPdf.copyPages(pdf, pdf.getPageIndices());
+                        pages.forEach(p => outPdf.addPage(p));
+                    }
+                }
+                const final = await outPdf.save({ useObjectStreams: true });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([final], { type: 'application/pdf' }));
+                link.download = `PDFA_Pro_${currentMode}.pdf`;
+                link.click();
+            } catch (err) { alert("Processing Error"); }
+            finally { document.getElementById('loader').style.display = 'none'; }
+        };
+
+        async function compressImage(buffer, q) {
+            const bitmap = await createImageBitmap(new Blob([buffer]));
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width; canvas.height = bitmap.height;
+            canvas.getContext('2d').drawImage(bitmap, 0, 0);
+            return new Promise(res => canvas.toBlob(b => b.arrayBuffer().then(res), 'image/jpeg', q));
+        }
+    </script>
+</body>
+</html>
