@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,30 +10,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --surface: #ffffff; --text: #1e293b; --sub: #64748b; }
         body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .app-card { width: 95%; max-width: 750px; background: var(--surface); border-radius: 24px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .app-card { width: 95%; max-width: 800px; background: var(--surface); border-radius: 24px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
         
-        /* Mode Selector */
-        .mode-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 25px; }
-        .mode-btn { border: 2px solid #f1f5f9; padding: 15px; border-radius: 16px; text-align: center; cursor: pointer; transition: 0.2s; background: #f8fafc; }
+        .mode-selector { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px; }
+        .mode-btn { border: 2px solid #f1f5f9; padding: 12px; border-radius: 16px; text-align: center; cursor: pointer; transition: 0.2s; background: #f8fafc; }
         .mode-btn.active { border-color: var(--primary); background: #f5f7ff; transform: scale(1.02); }
         .mode-btn i { color: var(--primary); margin-bottom: 8px; display: block; margin: 0 auto 8px; }
-        .mode-btn span { font-weight: 700; font-size: 0.8rem; }
+        .mode-btn span { font-weight: 700; font-size: 0.75rem; display: block; }
 
-        /* Upload Area */
         .upload-zone { border: 2px dashed #e2e8f0; border-radius: 20px; padding: 40px; text-align: center; cursor: pointer; background: #ffffff; transition: 0.2s; }
         .upload-zone:hover { border-color: var(--primary); background: #f9fafb; }
         
-        /* File Management */
         .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; padding: 0; margin: 20px 0; }
         .file-item { list-style: none; background: #f1f5f9; padding: 12px; border-radius: 12px; cursor: grab; position: relative; font-size: 0.75rem; text-align: center; border: 1px solid #e2e8f0; }
         .remove-btn { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; }
 
-        /* Settings Bar */
         .settings-bar { background: #f8fafc; padding: 15px; border-radius: 16px; margin-top: 15px; border: 1px solid #e2e8f0; }
         input[type="range"] { width: 100%; accent-color: var(--primary); }
 
@@ -49,22 +45,26 @@
 
     <div class="app-card">
         <header style="text-align: center; margin-bottom: 25px;">
-            <h2 style="margin:0; font-weight: 800;">FLUX<span> PDF</span></h2>
-            <p style="color: var(--sub); font-size: 0.85rem;">Select your document goal</p>
+            <h2 style="margin:0; font-weight: 800; letter-spacing: -1px;">FLUX<span style="color:var(--primary)">PDF</span></h2>
+            <p style="color: var(--sub); font-size: 0.85rem;">Lightning fast PDF Swiss-army knife</p>
         </header>
 
         <div class="mode-selector">
             <div class="mode-btn active" id="btn-merge" onclick="switchMode('merge')">
                 <i data-lucide="layers"></i>
-                <span>Merge PDF</span>
+                <span>Merge</span>
             </div>
-            <div class="mode-btn" id="btn-img" onclick="switchMode('image')">
+            <div class="mode-btn" id="btn-image" onclick="switchMode('image')">
                 <i data-lucide="image"></i>
-                <span>Image to PDF</span>
+                <span>To PDF</span>
             </div>
-            <div class="mode-btn" id="btn-comp" onclick="switchMode('compress')">
+            <div class="mode-btn" id="btn-compress" onclick="switchMode('compress')">
                 <i data-lucide="minimize-2"></i>
                 <span>Compress</span>
+            </div>
+            <div class="mode-btn" id="btn-pdf-to-img" onclick="switchMode('pdf-to-img')">
+                <i data-lucide="file-image"></i>
+                <span>To Image</span>
             </div>
         </div>
 
@@ -80,10 +80,10 @@
             
             <div id="comp-settings" class="settings-bar hidden">
                 <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:700; margin-bottom:10px;">
-                    <span>Strict Quality Level</span>
+                    <span id="setting-title">Strict Quality Level</span>
                     <span id="q-label" style="color:var(--primary)">50%</span>
                 </div>
-                <input type="range" id="quality" min="10" max="90" value="50">
+                <input type="range" id="quality" min="10" max="95" value="70">
             </div>
 
             <button class="btn-main" id="process-btn">Process & Download</button>
@@ -110,24 +110,32 @@
             currentMode = mode;
             resetApp();
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`btn-${mode === 'image' ? 'img' : mode === 'merge' ? 'merge' : 'comp'}`).classList.add('active');
+            document.getElementById(`btn-${mode}`).classList.add('active');
 
             const title = document.getElementById('up-title');
             const desc = document.getElementById('up-desc');
             const compSet = document.getElementById('comp-settings');
+            const setLabel = document.getElementById('setting-title');
+
+            compSet.classList.add('hidden');
+            fileInput.multiple = true;
 
             if(mode === 'merge') {
-                title.innerText = "Merge Multiple PDFs"; desc.innerText = "Fast merging of PDF documents";
-                fileInput.accept = ".pdf"; fileInput.multiple = true;
-                compSet.classList.add('hidden');
+                title.innerText = "Merge Multiple PDFs"; desc.innerText = "Combine documents in order";
+                fileInput.accept = ".pdf";
             } else if(mode === 'image') {
                 title.innerText = "Images to PDF"; desc.innerText = "Convert JPG/PNG to a single PDF";
-                fileInput.accept = "image/*"; fileInput.multiple = true;
-                compSet.classList.add('hidden');
-            } else {
-                title.innerText = "Strict Compression"; desc.innerText = "Forcefully shrink PDF file size";
+                fileInput.accept = "image/*";
+            } else if(mode === 'compress') {
+                title.innerText = "Strict Compression"; desc.innerText = "Shrink PDF via visual re-encoding";
                 fileInput.accept = ".pdf"; fileInput.multiple = false;
                 compSet.classList.remove('hidden');
+                setLabel.innerText = "Compression Intensity";
+            } else if(mode === 'pdf-to-img') {
+                title.innerText = "PDF to JPG"; desc.innerText = "Extract pages as high-quality images";
+                fileInput.accept = ".pdf"; fileInput.multiple = false;
+                compSet.classList.remove('hidden');
+                setLabel.innerText = "Image Quality";
             }
         }
 
@@ -147,7 +155,6 @@
             queue.forEach(item => {
                 const li = document.createElement('li');
                 li.className = 'file-item';
-                li.dataset.id = item.id;
                 li.innerHTML = `<i data-lucide="file"></i><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.file.name}</div><div class="remove-btn" onclick="removeItem('${item.id}', event)">×</div>`;
                 sortableList.appendChild(li);
             });
@@ -163,55 +170,82 @@
         }
 
         document.getElementById('process-btn').onclick = async () => {
+            if (queue.length === 0) return;
             document.getElementById('loader').style.display = 'flex';
             const { PDFDocument } = PDFLib;
-            const outPdf = await PDFDocument.create();
             const quality = qualitySlider.value / 100;
 
             try {
-                for (const item of queue) {
-                    const bytes = await item.file.arrayBuffer();
-                    if(currentMode === 'compress') {
-                        const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
-                        for (let i = 1; i <= pdfDoc.numPages; i++) {
-                            document.getElementById('load-msg').innerText = `Compressing Page ${i}...`;
-                            const page = await pdfDoc.getPage(i);
-                            const viewport = page.getViewport({ scale: 1.2 });
+                if (currentMode === 'pdf-to-img') {
+                    const zip = new JSZip();
+                    const file = queue[0].file;
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        document.getElementById('load-msg').innerText = `Extracting Page ${i}...`;
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 }); // High res
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.height = viewport.height; canvas.width = viewport.width;
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                        
+                        const imgData = canvas.toDataURL('image/jpeg', quality).split(',')[1];
+                        zip.file(`page-${i}.jpg`, imgData, {base64: true});
+                    }
+                    
+                    const content = await zip.generateAsync({type:"blob"});
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `Flux_Images.zip`;
+                    link.click();
+
+                } else {
+                    const outPdf = await PDFDocument.create();
+                    for (const item of queue) {
+                        const bytes = await item.file.arrayBuffer();
+                        if(currentMode === 'compress') {
+                            const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+                            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                                document.getElementById('load-msg').innerText = `Crunching Page ${i}...`;
+                                const page = await pdfDoc.getPage(i);
+                                const viewport = page.getViewport({ scale: 1.5 });
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                canvas.height = viewport.height; canvas.width = viewport.width;
+                                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                                const imgBytes = await new Promise(res => canvas.toBlob(b => b.arrayBuffer().then(res), 'image/jpeg', quality));
+                                const img = await outPdf.embedJpg(imgBytes);
+                                outPdf.addPage([img.width, img.height]).drawImage(img, { x:0, y:0, width:img.width, height:img.height });
+                            }
+                        } else if (currentMode === 'image') {
+                            const bitmap = await createImageBitmap(new Blob([bytes]));
                             const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            canvas.height = viewport.height; canvas.width = viewport.width;
-                            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                            const imgData = canvas.toDataURL('image/jpeg', quality);
-                            const imgBytes = await fetch(imgData).then(r => r.arrayBuffer());
+                            canvas.width = bitmap.width; canvas.height = bitmap.height;
+                            canvas.getContext('2d').drawImage(bitmap, 0, 0);
+                            const imgBytes = await new Promise(res => canvas.toBlob(b => b.arrayBuffer().then(res), 'image/jpeg', 0.9));
                             const img = await outPdf.embedJpg(imgBytes);
                             outPdf.addPage([img.width, img.height]).drawImage(img, { x:0, y:0, width:img.width, height:img.height });
+                        } else {
+                            const pdf = await PDFDocument.load(bytes);
+                            const pages = await outPdf.copyPages(pdf, pdf.getPageIndices());
+                            pages.forEach(p => outPdf.addPage(p));
                         }
-                    } else if (currentMode === 'image') {
-                        const imgBytes = await compressImage(bytes, 0.8);
-                        const img = await outPdf.embedJpg(imgBytes);
-                        outPdf.addPage([img.width, img.height]).drawImage(img, { x:0, y:0, width:img.width, height:img.height });
-                    } else {
-                        const pdf = await PDFDocument.load(bytes);
-                        const pages = await outPdf.copyPages(pdf, pdf.getPageIndices());
-                        pages.forEach(p => outPdf.addPage(p));
                     }
+                    const final = await outPdf.save();
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(new Blob([final], { type: 'application/pdf' }));
+                    link.download = `Flux_${currentMode}.pdf`;
+                    link.click();
                 }
-                const final = await outPdf.save({ useObjectStreams: true });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(new Blob([final], { type: 'application/pdf' }));
-                link.download = `PDFA_Pro_${currentMode}.pdf`;
-                link.click();
-            } catch (err) { alert("Processing Error"); }
-            finally { document.getElementById('loader').style.display = 'none'; }
+            } catch (err) { 
+                console.error(err);
+                alert("An error occurred during processing."); 
+            } finally { 
+                document.getElementById('loader').style.display = 'none'; 
+            }
         };
-
-        async function compressImage(buffer, q) {
-            const bitmap = await createImageBitmap(new Blob([buffer]));
-            const canvas = document.createElement('canvas');
-            canvas.width = bitmap.width; canvas.height = bitmap.height;
-            canvas.getContext('2d').drawImage(bitmap, 0, 0);
-            return new Promise(res => canvas.toBlob(b => b.arrayBuffer().then(res), 'image/jpeg', q));
-        }
     </script>
 </body>
 </html>
